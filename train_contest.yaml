@@ -1,0 +1,72 @@
+# pylearn2 tutorial example: cifar_grbm_smd.yaml by Ian Goodfellow
+#
+# Read the README file before reading this file
+#
+# This is an example of yaml file, which is the main way that an experimenter
+# interacts with pylearn2.
+#
+# A yaml file is very similar to a python dictionary, with a bit of extra
+# syntax.
+
+# The !obj tag allows us to create a specific class of object. The text after
+# the : indicates what class should be loaded. This is followed by a pair of
+# braces containing the arguments to that class's __init__ method.
+#
+# Here, we allocate a Train object, which represents the main loop of the
+# training script. The train script will run this loop repeatedly. Each time
+# through the loop, the model is trained on data from a training dataset, then
+# saved to file.
+
+!obj:pylearn2.train.Train {
+    # The !pkl tag is used to create an object from a pkl file. Here we retrieve
+    #the dataset made by make_dataset.py and use it as our training dataset.
+    dataset: &train !pkl: "contest_preprocessed_train.pkl",
+
+    #Next we make the model to be trained. It is a Binary Gaussian RBM
+    model: !obj:pylearn2.models.mlp.MLP {
+    layers: [
+             !obj:pylearn2.models.mlp.SoftmaxPool {
+                 layer_name: 'h0',
+                 detector_layer_dim: 4000,
+                 pool_size: 1,
+                 sparse_init: 15,
+             }, !obj:pylearn2.models.mlp.Softmax {
+                 layer_name: 'y',
+                 n_classes: 7,
+                 irange: 0.
+             }
+            ],
+    nvis: 2304,
+    },
+
+    # Next we need to specify the training algorithm that will be used to train
+    # the model.  Here we use stochastic gradient descent.
+
+    algorithm: !obj:pylearn2.training_algorithms.bgd.BGD {
+        batch_size: 100,
+        line_search_mode: 'exhaustive',
+        conjugate: 1,
+        updates_per_batch: 10,
+        monitoring_dataset:
+            {
+                'train' : *train,
+                'valid' : !pkl: "contest_preprocessed_valid.pkl"
+
+            },
+        cost: !obj:pylearn2.costs.cost.MethodCost {
+                method: 'cost_from_X',
+                supervised: 1
+        },
+        termination_criterion: !obj:pylearn2.termination_criteria.MonitorBased {
+            channel_name: "valid_y_misclass"
+        }
+    },
+    extensions: [
+        !obj:pylearn2.train_extensions.best_params.MonitorBasedSaveBest {
+             channel_name: 'valid_y_misclass',
+             save_path: "mlp_best.pkl"
+        },
+    ]
+}
+
+
